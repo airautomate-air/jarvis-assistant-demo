@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Jarvis AI Assistant</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #12151d;
+    --border: #232838;
+    --accent: #5b8cff;
+    --text: #e6e9f0;
+    --muted: #8a90a2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header img { width: 36px; height: 36px; border-radius: 8px; object-fit: cover; }
+  header h1 { font-size: 18px; margin: 0; }
+  header span { font-size: 12px; color: var(--muted); }
+  .notice {
+    margin: 14px 20px 0;
+    padding: 12px 14px;
+    background: #17203a;
+    border: 1px solid #29406e;
+    border-radius: 10px;
+    font-size: 13px;
+    color: #b9c7ee;
+    line-height: 1.5;
+  }
+  .notice b { color: #dfe7ff; }
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 780px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: white; border-bottom-right-radius: 2px; }
+  .msg.assistant { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+  .msg.pending { color: var(--muted); font-style: italic; }
+  footer {
+    padding: 16px 20px 20px;
+    border-top: 1px solid var(--border);
+  }
+  form {
+    max-width: 780px;
+    margin: 0 auto;
+    display: flex;
+    gap: 10px;
+  }
+  textarea {
+    flex: 1;
+    resize: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    padding: 12px 14px;
+    font-size: 14px;
+    font-family: inherit;
+    height: 46px;
+    max-height: 140px;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="/hero.png" alt="Jarvis" />
+  <div>
+    <h1>Jarvis</h1>
+    <span>text-chat demo</span>
+  </div>
+</header>
+
+<div class="notice">
+  <b>This is a limited public demo.</b> The full Jarvis runs locally on JP's MacBook with
+  real-time voice conversation, hand-gesture camera control, browser automation, and
+  smart-home integration. Those need local hardware (camera, mic, speakers) so they're
+  turned off here &mdash; this preview is just the conversational core, in text.
+</div>
+
+<main id="chat"></main>
+
+<footer>
+  <form id="form">
+    <textarea id="input" placeholder="Ask Jarvis something... (Enter to send, Shift+Enter for new line)"></textarea>
+    <button id="send" type="submit">Send</button>
+  </form>
+</footer>
+
+<script>
+  const chat = document.getElementById('chat');
+  const form = document.getElementById('form');
+  const input = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  let history = [];
+
+  function addMessage(role, text, pending) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role + (pending ? ' pending' : '');
+    div.textContent = text;
+    chat.appendChild(div);
+    chat.scrollTop = chat.scrollHeight;
+    return div;
+  }
+
+  addMessage('assistant', "Hi, I'm Jarvis. Ask me anything - just keep in mind this demo can only talk, not see or hear.");
+
+  async function send() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    sendBtn.disabled = true;
+    addMessage('user', text);
+    history.push({ role: 'user', content: text });
+    const pendingEl = addMessage('assistant', 'thinking...', true);
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history }),
+      });
+      if (!res.ok) throw new Error('request failed: ' + res.status);
+      const data = await res.json();
+      pendingEl.textContent = data.reply;
+      pendingEl.classList.remove('pending');
+      history.push({ role: 'assistant', content: data.reply });
+    } catch (err) {
+      pendingEl.textContent = 'Something went wrong reaching the assistant. Try again in a moment.';
+      pendingEl.classList.remove('pending');
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  form.addEventListener('submit', (e) => { e.preventDefault(); send(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+</script>
+
+</body>
+</html>
